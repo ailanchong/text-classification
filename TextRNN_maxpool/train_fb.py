@@ -261,14 +261,14 @@ def do_eval(sess,textRNN,evalX,evalY,batch_size):
     start = 0
     end = number_examples
     eval_loss,trueloss, eval_acc,eval_auc=0.0, 0.0, 0.0,0.0
+    probality_total = []
     while(start < end):
         if start+batch_size < end:
             curr_eval_loss, curr_tureloss, probality,curr_eval_acc= sess.run([textRNN.loss_val, textRNN.true_loss, textRNN.probality,textRNN.accuracy],#curr_eval_acc--->textCNN.accuracy
                                             feed_dict={textRNN.input_x: evalX[start:start+batch_size],textRNN.input_y: evalY[start:start+batch_size]
                                                 ,textRNN.dropout_keep_prob:1})
-            print(evalY[0])
-            print(probality[0])
-            eval_auc = eval_auc + roc_auc_score(evalY[start:start+batch_size], probality)
+
+            probality_total.extend(probality)
 
             eval_loss, trueloss, eval_acc = eval_loss + curr_eval_loss*batch_size, trueloss + curr_tureloss*batch_size, eval_acc + curr_eval_acc*batch_size
         else:
@@ -276,14 +276,15 @@ def do_eval(sess,textRNN,evalX,evalY,batch_size):
                                             feed_dict={textRNN.input_x: evalX[start:end],textRNN.input_y: evalY[start:end]
                                                 ,textRNN.dropout_keep_prob:1})
             rest_count = end - start
-            eval_auc = eval_auc + roc_auc_score(evalY[start:end], probality)
+            probality_total.extend(probality)
             eval_loss, trueloss, eval_acc = eval_loss + curr_eval_loss*rest_count, trueloss + curr_tureloss*rest_count, eval_acc + curr_eval_acc*rest_count  
         #logits = tf.sigmoid(logits)
         #label_list_top5 = get_label_using_logits(logits_[0], vocabulary_index2word_label)
         #curr_eval_acc=calculate_accuracy(list(label_list_top5), evalY[start:end][0],eval_counter)
         
         start = start+batch_size 
-    return eval_loss/float(end), trueloss/float(end), eval_acc/float(end),eval_auc/float(end)
+    eval_auc = roc_auc_score(evalY,np.asarray(probality_total))
+    return eval_loss/float(end), trueloss/float(end), eval_acc/float(end), eval_auc
 
 
 
