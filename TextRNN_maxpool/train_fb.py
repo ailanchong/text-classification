@@ -13,6 +13,7 @@ from keras.preprocessing.sequence import pad_sequences
 import pickle
 import matplotlib.pyplot as plt
 from oversample import label_shuffle
+from sklearn.metrics import roc_auc_score
 #configuration
 FLAGS=tf.app.flags.FLAGS
 tf.app.flags.DEFINE_integer("num_classes",6,"number of label")
@@ -21,13 +22,13 @@ tf.app.flags.DEFINE_integer("batch_size", 128, "Batch size for training/evaluati
 tf.app.flags.DEFINE_integer("decay_steps", 200, "how many steps before decay learning rate.") #批处理的大小 32-->128
 tf.app.flags.DEFINE_float("decay_rate", 0.9, "Rate of decay for learning rate.") #0.5一次衰减多少
 tf.app.flags.DEFINE_string("ckpt_dir","text_rnn_checkpoint/","checkpoint location for the model")
-tf.app.flags.DEFINE_integer("sequence_length",500,"max sentence length")
+tf.app.flags.DEFINE_integer("sequence_length",200,"max sentence length")
 tf.app.flags.DEFINE_integer("embed_size",300,"embedding size")
 tf.app.flags.DEFINE_boolean("is_training",True,"is traning.true:tranining,false:testing/inference")
-tf.app.flags.DEFINE_integer("num_epochs",5,"embedding size")
+tf.app.flags.DEFINE_integer("num_epochs",10,"embedding size")
 tf.app.flags.DEFINE_integer("validate_every", 1, "Validate every validate_every epochs.") #每10轮做一次验证
 tf.app.flags.DEFINE_boolean("use_embedding",True,"whether to use embedding or not.")
-tf.app.flags.DEFINE_string("file_path","/home/lanchong/text-classification/data_process/clean_data/file_train","train data and val data and embedding matrix")
+tf.app.flags.DEFINE_string("file_path","/home/lanchong/toxic/text-classification/data/twice/file_train","train data and val data and embedding matrix")
 #tf.app.flags.DEFINE_string("traning_data_path","train-zhihu4-only-title-all.txt","path of traning data.") #train-zhihu4-only-title-all.txt===>training-data/test-zhihu4-only-title.txt--->'training-data/train-zhihu5-only-title-multilabel.txt'
 #tf.app.flags.DEFINE_string("word2vec_model_path","zhihu-word2vec.bin-100","word2vec's vocabulary and vectors")
 
@@ -130,6 +131,7 @@ def main(_):
         batch_size=FLAGS.batch_size
         number_of_training_data=len(trainX)
         train_gendata = generate_batch(trainX, trainY, batch_size)
+        early_stop = False
         for epoch in range(curr_epoch,FLAGS.num_epochs):
             loss, trueloss, acc, counter = 0.0, 0.0, 0.0, 0
             #trainX, trainY = label_shuffle(orignal_X, orignal_Y)
@@ -142,7 +144,7 @@ def main(_):
                 curr_loss, curr_tureloss, curr_acc, _, step_num = sess.run([textRNN.loss_val, textRNN.true_loss, textRNN.accuracy, textRNN.train_op, textRNN.global_step],
                                                                             feed_dict={textRNN.input_x:batch_x,
                                                                                       textRNN.input_y:batch_y,
-                                                                                      textRNN.dropout_keep_prob:1}) #curr_acc--->TextCNN.accuracy -->,textRNN.dropout_keep_prob:1
+                                                                                      textRNN.dropout_keep_prob:0.9}) #curr_acc--->TextCNN.accuracy -->,textRNN.dropout_keep_prob:1
                 loss,trueloss, counter,acc=loss+curr_loss, trueloss+curr_tureloss, counter+1,acc+curr_acc
                 step_list.append(step_num)
                 loss_list.append(curr_tureloss)
@@ -151,10 +153,16 @@ def main(_):
             #epoch increment
                 if step_num % 50 == 0:
                     test_step_list.append(step_num)
-                    eval_loss, eval_trueloss, eval_acc=do_eval(sess,textRNN,testX,testY,batch_size)
-                    print("Epoch %d Validation Loss:%.3f\tValidation trueLoss:%.3f\tValidation Accuracy: %.3f" % (epoch,eval_loss,eval_trueloss,eval_acc))
+                    eval_loss, eval_trueloss, eval_acc,eval_auc=do_eval(sess,textRNN,testX,testY,batch_size)
+                    print("Epoch %d Validation Loss:%.3f\tValidation trueLoss:%.3f\tValidation Accuracy: %.3f\tValidation AUC:%.3f" % (epoch,eval_loss,eval_trueloss,eval_acc,eval_auc))
                     test_loss_list.append(eval_trueloss)
-            
+                    if eval_trueloss <= 0.039:
+                        save_path=FLAGS.ckpt_dir+"model.ckpt"
+                        saver.save(sess,save_path,global_step=epoch)
+                        early_stop = True
+                        break
+            if early_stop == True:
+                break
             with open("./train_history",'wb') as file_out:
                 pickle.dump([step_list, loss_list, test_step_list, test_loss_list], file_out)
                    
@@ -252,25 +260,30 @@ def do_eval(sess,textRNN,evalX,evalY,batch_size):
     number_examples=len(evalX)
     start = 0
     end = number_examples
-    eval_loss,trueloss, eval_acc=0.0, 0.0, 0.0,
+    eval_loss,trueloss, eval_acc,eval_auc=0.0, 0.0, 0.0,0.0
     while(start < end):
         if start+batch_size < end:
-            curr_eval_loss, curr_tureloss, logits,curr_eval_acc= sess.run([textRNN.loss_val, textRNN.true_loss, textRNN.logits,textRNN.accuracy],#curr_eval_acc--->textCNN.accuracy
+            curr_eval_loss, curr_tureloss, probality,curr_eval_acc= sess.run([textRNN.loss_val, textRNN.true_loss, textRNN.probality,textRNN.accuracy],#curr_eval_acc--->textCNN.accuracy
                                             feed_dict={textRNN.input_x: evalX[start:start+batch_size],textRNN.input_y: evalY[start:start+batch_size]
                                                 ,textRNN.dropout_keep_prob:1})
+            print(evalY[0])
+            print(probality[0])
+            eval_auc = eval_auc + roc_auc_score(evalY[start:start+batch_size], probality)
+
             eval_loss, trueloss, eval_acc = eval_loss + curr_eval_loss*batch_size, trueloss + curr_tureloss*batch_size, eval_acc + curr_eval_acc*batch_size
         else:
-            curr_eval_loss, curr_tureloss, logits,curr_eval_acc= sess.run([textRNN.loss_val, textRNN.true_loss, textRNN.logits,textRNN.accuracy],#curr_eval_acc--->textCNN.accuracy
+            curr_eval_loss, curr_tureloss, probality,curr_eval_acc= sess.run([textRNN.loss_val, textRNN.true_loss, textRNN.probality,textRNN.accuracy],#curr_eval_acc--->textCNN.accuracy
                                             feed_dict={textRNN.input_x: evalX[start:end],textRNN.input_y: evalY[start:end]
                                                 ,textRNN.dropout_keep_prob:1})
             rest_count = end - start
-            eval_loss, trueloss, eval_acc = eval_loss + curr_eval_loss*rest_count, trueloss + curr_tureloss*rest_count, eval_acc + curr_eval_acc*rest_count   
+            eval_auc = eval_auc + roc_auc_score(evalY[start:end], probality)
+            eval_loss, trueloss, eval_acc = eval_loss + curr_eval_loss*rest_count, trueloss + curr_tureloss*rest_count, eval_acc + curr_eval_acc*rest_count  
         #logits = tf.sigmoid(logits)
         #label_list_top5 = get_label_using_logits(logits_[0], vocabulary_index2word_label)
         #curr_eval_acc=calculate_accuracy(list(label_list_top5), evalY[start:end][0],eval_counter)
         
         start = start+batch_size 
-    return eval_loss/float(end), trueloss/float(end), eval_acc/float(end)
+    return eval_loss/float(end), trueloss/float(end), eval_acc/float(end),eval_auc/float(end)
 
 
 

@@ -3,7 +3,7 @@
 import tensorflow as tf
 from tensorflow.contrib import rnn
 import numpy as np
-
+from sklearn.metrics import roc_auc_score
 class TextRNN:
     def __init__(self,num_classes, learning_rate, batch_size, decay_steps, decay_rate,sequence_length,
                  vocab_size,embed_size,is_training,initializer=tf.random_normal_initializer(stddev=0.1)):
@@ -46,7 +46,7 @@ class TextRNN:
         """define all weights here"""
         with tf.name_scope("embedding"): # embedding matrix
             self.Embedding = tf.get_variable("Embedding",shape=[self.vocab_size, self.embed_size],initializer=self.initializer,trainable=False) #[vocab_size,embed_size] tf.random_uniform([self.vocab_size, self.embed_size],-1.0,1.0)
-            self.W_relu = tf.get_variable("W_relu",shape=[self.sequence_length*2, 50],initializer=self.initializer) #[embed_size,label_size]
+            self.W_relu = tf.get_variable("W_relu",shape=[self.hidden_size*2+self.sequence_length*4, 50],initializer=self.initializer) #[embed_size,label_size]
             self.b_relu = tf.get_variable("bias_relu",shape=[50])       #[label_size]
             self.W_projection = tf.get_variable("W_projection",shape=[50, self.num_classes],initializer=self.initializer) #[embed_size,label_size]
             self.b_projection = tf.get_variable("bias_projection",shape=[self.num_classes])       #[label_size]
@@ -67,21 +67,34 @@ class TextRNN:
         outputs,_=tf.nn.bidirectional_dynamic_rnn(lstm_fw_cell,lstm_bw_cell,self.embedded_words,dtype=tf.float32) #[batch_size,sequence_length,hidden_size] #creates a dynamic bidirectional recurrent neural network
         print("outputs:===>",outputs) #outputs:(<tf.Tensor 'bidirectional_rnn/fw/fw/transpose:0' shape=(?, 5, 100) dtype=float32>, <tf.Tensor 'ReverseV2:0' shape=(?, 5, 100) dtype=float32>))
         #3. concat output
+        
+
+        
         output_fw = outputs[0]
         output_bw = outputs[1]
-        output_rnn_fw = tf.reduce_max(output_fw,axis=2)
-        output_rnn_bw = tf.reduce_max(output_bw,axis=2)
-        self.output_rnn_last = tf.concat([output_rnn_fw, output_rnn_bw], axis=1)
+        output_rnn_fw_max = tf.reduce_max(output_fw,axis=2)
+        output_rnn_bw_max = tf.reduce_max(output_bw,axis=2)
+        output_rnn_fw_avg = tf.reduce_mean(output_fw,axis=2)
+        output_rnn_bw_avg = tf.reduce_mean(output_bw,axis=2)
+
+        output_rnn_last = tf.concat(outputs,axis=2) #[batch_size,sequence_length,hidden_size*2]
+        output_rnn_last = output_rnn_last[:,-1,:]
+
+        self.output_rnn_last = tf.concat([output_rnn_fw_max, output_rnn_bw_max, output_rnn_fw_avg, output_rnn_bw_avg, output_rnn_last], axis=1)
+        
+
+
+
         #self.output_rnn_last = tf.concat(outputs,axis=2) #[batch_size,sequence_length,hidden_size*2]
-        #self.output_rnn_last = output_rnn[:,-1,:]
+        #self.output_rnn_last = self.output_rnn_last[:,-1,:]
         #self.output_rnn_last=tf.reduce_max(output_rnn,axis=2) #[batch_size,hidden_size*2] #output_rnn_last=output_rnn[:,-1,:] ##[batch_size,hidden_size*2] #TODO
         print("output_rnn_last:", self.output_rnn_last) # <tf.Tensor 'strided_slice:0' shape=(?, 200) dtype=float32>
         #4. logits(use linear layer)
         with tf.name_scope("output"): #inputs: A `Tensor` of shape `[batch_size, dim]`.  The forward activations of the input network.
-            self.output_rnn_last = tf.nn.dropout(self.output_rnn_last, self.dropout_keep_prob)
+            #self.output_rnn_last = tf.nn.dropout(self.output_rnn_last, self.dropout_keep_prob)
             temp = tf.nn.relu(tf.matmul(self.output_rnn_last, self.W_relu) + self.b_relu)  # [batch_size,num_classes]
-            temp_drop = tf.nn.dropout(temp, self.dropout_keep_prob)
-            logits = tf.matmul(temp_drop, self.W_projection) + self.b_projection
+            #temp_drop = tf.nn.dropout(temp, self.dropout_keep_prob)
+            logits = tf.matmul(temp, self.W_projection) + self.b_projection
         return logits
 
     def loss(self,l2_lambda=0.0):
@@ -99,6 +112,11 @@ class TextRNN:
             l2_losses = tf.add_n([tf.nn.l2_loss(v) for v in tf.trainable_variables() if 'bias' not in v.name]) * l2_lambda
             total_loss=loss+l2_losses
         return total_loss, loss
+
+
+
+
+
 
     def loss_nce(self,l2_lambda=0.0001): #0.0001-->0.001
         """calculate loss using (NCE)cross entropy here"""

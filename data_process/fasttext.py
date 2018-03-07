@@ -1,10 +1,11 @@
-import fasttext
+from pyfasttext import FastText
 '''
 model = FastText()
 model.skipgram(input="./clean_corpus", output='model', epoch=100, lr=0.7)
 print(model.nwords)
 '''
-model = fasttext.load_model('model.bin')
+#model = fasttext.load_model('../data/model.bin')
+model = FastText('../data/model.bin')
 def get_set(filepath):
     result = set()
     with open(filepath, 'r') as file_in:

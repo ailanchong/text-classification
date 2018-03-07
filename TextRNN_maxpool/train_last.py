@@ -20,13 +20,13 @@ tf.app.flags.DEFINE_integer("batch_size", 128, "Batch size for training/evaluati
 tf.app.flags.DEFINE_integer("decay_steps", 300, "how many steps before decay learning rate.") #批处理的大小 32-->128
 tf.app.flags.DEFINE_float("decay_rate", 0.9, "Rate of decay for learning rate.") #0.5一次衰减多少
 tf.app.flags.DEFINE_string("ckpt_dir","text_rnn_checkpoint/","checkpoint location for the model")
-tf.app.flags.DEFINE_integer("sequence_length",800,"max sentence length")
+tf.app.flags.DEFINE_integer("sequence_length",200,"max sentence length")
 tf.app.flags.DEFINE_integer("embed_size",300,"embedding size")
 tf.app.flags.DEFINE_boolean("is_training",True,"is traning.true:tranining,false:testing/inference")
 tf.app.flags.DEFINE_integer("num_epochs",5,"embedding size")
 tf.app.flags.DEFINE_integer("validate_every", 1, "Validate every validate_every epochs.") #每10轮做一次验证
 tf.app.flags.DEFINE_boolean("use_embedding",True,"whether to use embedding or not.")
-tf.app.flags.DEFINE_string("file_path","/home/lanchong/text-classification/data_process/clean_data/file_train","train data and val data and embedding matrix")
+tf.app.flags.DEFINE_string("file_path","/home/lanchong/toxic/text-classification/data/twice/file_train","train data and val data and embedding matrix")
 #tf.app.flags.DEFINE_string("traning_data_path","train-zhihu4-only-title-all.txt","path of traning data.") #train-zhihu4-only-title-all.txt===>training-data/test-zhihu4-only-title.txt--->'training-data/train-zhihu5-only-title-multilabel.txt'
 #tf.app.flags.DEFINE_string("word2vec_model_path","zhihu-word2vec.bin-100","word2vec's vocabulary and vectors")
 
@@ -110,7 +110,7 @@ def main(_):
                 if epoch==0 and counter==0:
                     print("trainX[start:end]:",trainX[start:end])#;print("trainY[start:end]:",trainY[start:end])
                 curr_loss, curr_tureloss, curr_acc, _, step_num = sess.run([textRNN.loss_val, textRNN.true_loss, textRNN.accuracy, textRNN.train_op, textRNN.global_step],feed_dict={textRNN.input_x:trainX[start:end],textRNN.input_y:trainY[start:end]
-                    ,textRNN.dropout_keep_prob:1}) #curr_acc--->TextCNN.accuracy -->,textRNN.dropout_keep_prob:1
+                    ,textRNN.dropout_keep_prob:0.9}) #curr_acc--->TextCNN.accuracy -->,textRNN.dropout_keep_prob:1
                 loss,trueloss, counter,acc=loss+curr_loss, trueloss+curr_tureloss, counter+1,acc+curr_acc
                 step_list.append(step_num)
                 loss_list.append(curr_tureloss)
@@ -123,7 +123,7 @@ def main(_):
                     eval_loss, eval_trueloss, eval_acc=do_eval(sess,textRNN,testX,testY,batch_size)
                     print("Epoch %d Validation Loss:%.4f\tValidation trueLoss:%.4f\tValidation Accuracy: %.4f" % (epoch,eval_loss,eval_trueloss,eval_acc))
                     test_loss_list.append(eval_trueloss)
-                    if eval_trueloss <= 0.0464:
+                    if eval_trueloss <= 0.039:
                         save_path=FLAGS.ckpt_dir+"model.ckpt"
                         saver.save(sess,save_path,global_step=epoch)
                         early_stop = True

@@ -22,7 +22,7 @@ def shuffle_split(train_x, train_y, ratio=0.1):
     return t_x, t_y, v_x, v_y
 
 
-with open("data_file",'rb') as file_in:
+with open("../data/twice/data_file",'rb') as file_in:
     trainX, trainY, embed_matrix,test_x = pickle.load(file_in)
     t_x, t_y, v_x, v_y = shuffle_split(trainX, trainY, ratio=0.1)
 
@@ -30,6 +30,6 @@ print("train sample num is %s" %len(t_x))
 
 total = [t_x, t_y, v_x, v_y, embed_matrix]
 
-with open("file_train",'wb') as file_in:
+with open("../data/twice/file_train",'wb') as file_in:
     pickle.dump(total, file_in)
 

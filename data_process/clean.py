@@ -82,6 +82,21 @@ def split_words(text, corr_map):
             result.append(word)
     return result
 
+def replace_words(text, in2out_map, vocab_in):
+    result = []
+    for word in text:
+        if(in2out_map.get(word) != None):
+            temp = in2out_map.get(word)
+            if(temp == "none"):
+                continue
+            #temp = temp.split(" ")
+            result.append(temp)
+        else:
+            if word not in vocab_in:
+                continue
+            result.append(word)
+    return result
+
 def get_keyword(text, knowset, keyset, commonset):
     result = []
     for word in text:
@@ -177,6 +192,88 @@ def clean(comment, swear_words, corr_map, knowset, keyset, commonset):
     words = combine_swear_words(words, swear_words) #合并f_u_c_k >>> fuck
     words = split_words(words, corr_map) #拆分 mothafuckin >> mother fuck
     #words = get_keyword(words, knowset, keyset, commonset) #提取脏话主干，并且保留特定语料的常用词
+    clean_sent=" ".join(words)
+    return clean_sent
+
+
+def clean_twice(comment, swear_words, corr_map, knowset, keyset, commonset, in2out_map, vocab_in):
+    APPO = {
+    "aren't" : "are not",
+    "can't" : "cannot",
+    "couldn't" : "could not",
+    "didn't" : "did not",
+    "doesn't" : "does not",
+    "don't" : "do not",
+    "hadn't" : "had not",
+    "hasn't" : "has not",
+    "haven't" : "have not",
+    "he'd" : "he would",
+    "he'll" : "he will",
+    "he's" : "he is",
+    "i'd" : "I would",
+    "i'd" : "I had",
+    "i'll" : "I will",
+    "i'm" : "I am",
+    "isn't" : "is not",
+    "it's" : "it is",
+    "it'll":"it will",
+    "i've" : "I have",
+    "let's" : "let us",
+    "mightn't" : "might not",
+    "mustn't" : "must not",
+    "shan't" : "shall not",
+    "she'd" : "she would",
+    "she'll" : "she will",
+    "she's" : "she is",
+    "shouldn't" : "should not",
+    "that's" : "that is",
+    "there's" : "there is",
+    "they'd" : "they would",
+    "they'll" : "they will",
+    "they're" : "they are",
+    "they've" : "they have",
+    "we'd" : "we would",
+    "we're" : "we are",
+    "weren't" : "were not",
+    "we've" : "we have",
+    "what'll" : "what will",
+    "what're" : "what are",
+    "what's" : "what is",
+    "what've" : "what have",
+    "where's" : "where is",
+    "who'd" : "who would",
+    "who'll" : "who will",
+    "who're" : "who are",
+    "who's" : "who is",
+    "who've" : "who have",
+    "won't" : "will not",
+    "wouldn't" : "would not",
+    "you'd" : "you would",
+    "you'll" : "you will",
+    "you're" : "you are",
+    "you've" : "you have",
+    "'re": " are",
+    "wasn't": "was not",
+    "we'll":" will",
+    "didn't": "did not",
+    "tryin'":"trying"
+    }
+    comment = comment.lower()
+    comment = re.sub("\\n"," ",comment)
+    comment = re.sub("\d{1,3}.\d{1,3}.\d{1,3}.\d{1,3}","ip",comment) #去掉IP
+    comment = re.sub("\[\[.*\]","username",comment) #去掉用户名
+    tokenizer=TweetTokenizer()
+    lem = WordNetLemmatizer()
+    words=tokenizer.tokenize(comment)
+    words=[APPO[word] if word in APPO else word for word in words]
+    words=[lem.lemmatize(word, "v") for word in words]
+    words=[lem.lemmatize(word, "n") for word in words]
+    words = delete_at(words) #去掉@
+    words = delete_http(words) #去掉http
+    words = combine_swear_words(words, swear_words) #合并f_u_c_k >>> fuck
+    words = split_words(words, corr_map) #拆分 mothafuckin >> mother fuck
+    #words = get_keyword(words, knowset, keyset, commonset) #提取脏话主干，并且保留特定语料的常用词
+    words = replace_words(words, in2out_map, vocab_in)
     clean_sent=" ".join(words)
     return clean_sent
 

@@ -21,13 +21,13 @@ tf.app.flags.DEFINE_integer("batch_size", 128, "Batch size for training/evaluati
 tf.app.flags.DEFINE_integer("decay_steps", 200, "how many steps before decay learning rate.") #批处理的大小 32-->128
 tf.app.flags.DEFINE_float("decay_rate", 0.9, "Rate of decay for learning rate.") #0.5一次衰减多少
 tf.app.flags.DEFINE_string("ckpt_dir","text_rnn_checkpoint/","checkpoint location for the model")
-tf.app.flags.DEFINE_integer("sequence_length",800,"max sentence length")
+tf.app.flags.DEFINE_integer("sequence_length",200,"max sentence length")
 tf.app.flags.DEFINE_integer("embed_size",300,"embedding size")
 tf.app.flags.DEFINE_boolean("is_training",False,"is traning.true:tranining,false:testing/inference")
 tf.app.flags.DEFINE_integer("num_epochs",50,"embedding size")
 tf.app.flags.DEFINE_integer("validate_every", 1, "Validate every validate_every epochs.") #每10轮做一次验证
 tf.app.flags.DEFINE_boolean("use_embedding",True,"whether to use embedding or not.")
-tf.app.flags.DEFINE_string("file_path","../data_process/clean_data/data_file","train data and val data and embedding matrix")
+tf.app.flags.DEFINE_string("file_path","/home/lanchong/toxic/text-classification/data/twice/data_file","train data and val data and embedding matrix")
 #tf.app.flags.DEFINE_string("traning_data_path","train-zhihu4-only-title-all.txt","path of traning data.") #train-zhihu4-only-title-all.txt===>training-data/test-zhihu4-only-title.txt--->'training-data/train-zhihu5-only-title-multilabel.txt'
 #tf.app.flags.DEFINE_string("word2vec_model_path","zhihu-word2vec.bin-100","word2vec's vocabulary and vectors")
 
@@ -44,7 +44,7 @@ def main(_):
     with open(FLAGS.file_path, 'rb') as data_f:
         X_t,train_y,embedding_matrix,X_te= pickle.load(data_f)
         vocab_size = len(embedding_matrix)
-        #X_te = pad_sequences(X_te, maxlen=FLAGS.sequence_length, value=0.)  # padding to max length
+        X_te = pad_sequences(X_te, maxlen=FLAGS.sequence_length, value=0.)  # padding to max length
         #print("total train sample num is %s" %len(trainX))
 
     '''
@@ -73,7 +73,7 @@ def main(_):
     #2.create session.
     config=tf.ConfigProto()
     config.gpu_options.allow_growth=True
-    sample_submission = pd.read_csv('../data_process/sample_submission.csv')
+    sample_submission = pd.read_csv('../data/sample_submission.csv')
     list_classes = ["toxic", "severe_toxic", "obscene", "threat", "insult", "identity_hate"]
     with tf.Session(config=config) as sess:
         #Instantiate Model
