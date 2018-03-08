@@ -21,14 +21,14 @@ tf.app.flags.DEFINE_float("learning_rate",0.001,"learning rate")
 tf.app.flags.DEFINE_integer("batch_size", 128, "Batch size for training/evaluating.") #批处理的大小 32-->128
 tf.app.flags.DEFINE_integer("decay_steps", 200, "how many steps before decay learning rate.") #批处理的大小 32-->128
 tf.app.flags.DEFINE_float("decay_rate", 0.9, "Rate of decay for learning rate.") #0.5一次衰减多少
-tf.app.flags.DEFINE_string("ckpt_dir","text_rnn_checkpoint/","checkpoint location for the model")
+tf.app.flags.DEFINE_string("ckpt_dir","/output/","checkpoint location for the model")
 tf.app.flags.DEFINE_integer("sequence_length",200,"max sentence length")
 tf.app.flags.DEFINE_integer("embed_size",300,"embedding size")
 tf.app.flags.DEFINE_boolean("is_training",True,"is traning.true:tranining,false:testing/inference")
 tf.app.flags.DEFINE_integer("num_epochs",10,"embedding size")
 tf.app.flags.DEFINE_integer("validate_every", 1, "Validate every validate_every epochs.") #每10轮做一次验证
 tf.app.flags.DEFINE_boolean("use_embedding",True,"whether to use embedding or not.")
-tf.app.flags.DEFINE_string("file_path","/home/lanchong/toxic/text-classification/data/twice/file_train","train data and val data and embedding matrix")
+tf.app.flags.DEFINE_string("file_path","/input/file_train","train data and val data and embedding matrix")
 #tf.app.flags.DEFINE_string("traning_data_path","train-zhihu4-only-title-all.txt","path of traning data.") #train-zhihu4-only-title-all.txt===>training-data/test-zhihu4-only-title.txt--->'training-data/train-zhihu5-only-title-multilabel.txt'
 #tf.app.flags.DEFINE_string("word2vec_model_path","zhihu-word2vec.bin-100","word2vec's vocabulary and vectors")
 
@@ -116,7 +116,7 @@ def main(_):
                 #assign_pretrained_word_embedding(sess, vocabulary_index2word, vocab_size, textRNN,word2vec_model_path=FLAGS.word2vec_model_path)
                 assign_pretrained_word_embedding(sess,embed_matrix, textRNN)
         
-        if "train_history" in os.listdir("./") :
+        if "train_history" in os.listdir("/output") :
             with open("train_history", 'rb') as file_in:
                 step_list, loss_list, test_step_list, test_loss_list = pickle.load(file_in)
         else:
@@ -163,7 +163,7 @@ def main(_):
                         break
             if early_stop == True:
                 break
-            with open("./train_history",'wb') as file_out:
+            with open("train_history",'wb') as file_out:
                 pickle.dump([step_list, loss_list, test_step_list, test_loss_list], file_out)
                    
 

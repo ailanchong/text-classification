@@ -4,6 +4,10 @@ import tensorflow as tf
 from tensorflow.contrib import rnn
 import numpy as np
 from sklearn.metrics import roc_auc_score
+from keras.layers import GlobalAveragePooling1D, GlobalMaxPooling1D, concatenate, SpatialDropout1D
+from keras import backend as K
+
+K.set_learning_phase(0) #set learning phase
 class TextRNN:
     def __init__(self,num_classes, learning_rate, batch_size, decay_steps, decay_rate,sequence_length,
                  vocab_size,embed_size,is_training,initializer=tf.random_normal_initializer(stddev=0.1)):
@@ -54,6 +58,7 @@ class TextRNN:
         """main computation graph here: 1. embeddding layer, 2.Bi-LSTM layer, 3.concat, 4.FC layer 5.softmax """
         #1.get emebedding of words in the sentence
         self.embedded_words = tf.nn.embedding_lookup(self.Embedding,self.input_x) #shape:[None,sentence_length,embed_size]
+        self.embedded_words = SpatialDropout1D(0.2)(self.embedded_words)
         #2. Bi-lstm layer
         # define lstm cess:get lstm cell output
         lstm_fw_cell=rnn.BasicLSTMCell(self.hidden_size) #forward direction cell
