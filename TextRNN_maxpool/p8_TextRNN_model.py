@@ -7,7 +7,7 @@ from sklearn.metrics import roc_auc_score
 from keras.layers import GlobalAveragePooling1D, GlobalMaxPooling1D, concatenate, SpatialDropout1D
 from keras import backend as K
 
-K.set_learning_phase(0) #set learning phase
+#set learning phase
 class TextRNN:
     def __init__(self,num_classes, learning_rate, batch_size, decay_steps, decay_rate,sequence_length,
                  vocab_size,embed_size,is_training,initializer=tf.random_normal_initializer(stddev=0.1)):
@@ -18,7 +18,7 @@ class TextRNN:
         self.sequence_length=sequence_length
         self.vocab_size=vocab_size
         self.embed_size=embed_size
-        self.hidden_size=300
+        self.hidden_size=128
         self.is_training=is_training
         self.learning_rate=learning_rate
         self.initializer=initializer
@@ -33,7 +33,6 @@ class TextRNN:
         self.epoch_step=tf.Variable(0,trainable=False,name="Epoch_Step")
         self.epoch_increment=tf.assign(self.epoch_step,tf.add(self.epoch_step,tf.constant(1)))
         self.decay_steps, self.decay_rate = decay_steps, decay_rate
-
         self.instantiate_weights()
         self.logits = self.inference() #[None, self.label_size]. main computation graph is here.
         self.probality = tf.sigmoid(self.logits)
@@ -50,9 +49,9 @@ class TextRNN:
         """define all weights here"""
         with tf.name_scope("embedding"): # embedding matrix
             self.Embedding = tf.get_variable("Embedding",shape=[self.vocab_size, self.embed_size],initializer=self.initializer,trainable=False) #[vocab_size,embed_size] tf.random_uniform([self.vocab_size, self.embed_size],-1.0,1.0)
-            self.W_relu = tf.get_variable("W_relu",shape=[self.hidden_size*2+self.sequence_length*4, 50],initializer=self.initializer) #[embed_size,label_size]
+            self.W_relu = tf.get_variable("W_relu",shape=[self.hidden_size*4, 50],initializer=self.initializer) #[embed_size,label_size]
             self.b_relu = tf.get_variable("bias_relu",shape=[50])       #[label_size]
-            self.W_projection = tf.get_variable("W_projection",shape=[50, self.num_classes],initializer=self.initializer) #[embed_size,label_size]
+            self.W_projection = tf.get_variable("W_projection",shape=[self.hidden_size*4, self.num_classes],initializer=self.initializer) #[embed_size,label_size]
             self.b_projection = tf.get_variable("bias_projection",shape=[self.num_classes])       #[label_size]
     def inference(self):
         """main computation graph here: 1. embeddding layer, 2.Bi-LSTM layer, 3.concat, 4.FC layer 5.softmax """
@@ -61,8 +60,8 @@ class TextRNN:
         self.embedded_words = SpatialDropout1D(0.2)(self.embedded_words)
         #2. Bi-lstm layer
         # define lstm cess:get lstm cell output
-        lstm_fw_cell=rnn.BasicLSTMCell(self.hidden_size) #forward direction cell
-        lstm_bw_cell=rnn.BasicLSTMCell(self.hidden_size) #backward direction cell
+        lstm_fw_cell=rnn.GRUCell(self.hidden_size) #forward direction cell
+        lstm_bw_cell=rnn.GRUCell(self.hidden_size) #backward direction cell
         if self.dropout_keep_prob is not None:
             lstm_fw_cell=rnn.DropoutWrapper(lstm_fw_cell,output_keep_prob=self.dropout_keep_prob)
             lstm_bw_cell=rnn.DropoutWrapper(lstm_bw_cell,output_keep_prob=self.dropout_keep_prob)
@@ -74,7 +73,9 @@ class TextRNN:
         #3. concat output
         
 
-        
+        output_rnn_last = tf.concat(outputs,axis=2) #[batch_size,sequence_length,hidden_size*2]
+        #output_rnn_last = output_rnn_last[:,-1,:]
+        '''   
         output_fw = outputs[0]
         output_bw = outputs[1]
         output_rnn_fw_max = tf.reduce_max(output_fw,axis=2)
@@ -82,12 +83,13 @@ class TextRNN:
         output_rnn_fw_avg = tf.reduce_mean(output_fw,axis=2)
         output_rnn_bw_avg = tf.reduce_mean(output_bw,axis=2)
 
-        output_rnn_last = tf.concat(outputs,axis=2) #[batch_size,sequence_length,hidden_size*2]
-        output_rnn_last = output_rnn_last[:,-1,:]
+
 
         self.output_rnn_last = tf.concat([output_rnn_fw_max, output_rnn_bw_max, output_rnn_fw_avg, output_rnn_bw_avg, output_rnn_last], axis=1)
-        
-
+        '''
+        output_rnn_avg = GlobalAveragePooling1D()(output_rnn_last)
+        output_rnn_max = GlobalMaxPooling1D()(output_rnn_last)
+        self.output_rnn_last = tf.concat([output_rnn_avg, output_rnn_max], axis=1)
 
 
         #self.output_rnn_last = tf.concat(outputs,axis=2) #[batch_size,sequence_length,hidden_size*2]
@@ -97,9 +99,11 @@ class TextRNN:
         #4. logits(use linear layer)
         with tf.name_scope("output"): #inputs: A `Tensor` of shape `[batch_size, dim]`.  The forward activations of the input network.
             #self.output_rnn_last = tf.nn.dropout(self.output_rnn_last, self.dropout_keep_prob)
-            temp = tf.nn.relu(tf.matmul(self.output_rnn_last, self.W_relu) + self.b_relu)  # [batch_size,num_classes]
+            
+            #temp = tf.nn.relu(tf.matmul(self.output_rnn_last, self.W_relu) + self.b_relu)  # [batch_size,num_classes]
             #temp_drop = tf.nn.dropout(temp, self.dropout_keep_prob)
-            logits = tf.matmul(temp, self.W_projection) + self.b_projection
+            #logits = tf.matmul(temp, self.W_projection) + self.b_projection
+            logits = tf.matmul(self.output_rnn_last, self.W_projection) + self.b_projection
         return logits
 
     def loss(self,l2_lambda=0.0):

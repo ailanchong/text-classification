@@ -12,22 +12,22 @@ from keras.preprocessing.sequence import pad_sequences
 #import word2vec
 import pickle
 import pandas as pd
-
+from keras import backend as K
 #configuration
 FLAGS=tf.app.flags.FLAGS
 tf.app.flags.DEFINE_integer("num_classes",6,"number of label")
 tf.app.flags.DEFINE_float("learning_rate",0.001,"learning rate")
-tf.app.flags.DEFINE_integer("batch_size", 128, "Batch size for training/evaluating.") #批处理的大小 32-->128
+tf.app.flags.DEFINE_integer("batch_size", 512, "Batch size for training/evaluating.") #批处理的大小 32-->128
 tf.app.flags.DEFINE_integer("decay_steps", 200, "how many steps before decay learning rate.") #批处理的大小 32-->128
 tf.app.flags.DEFINE_float("decay_rate", 0.9, "Rate of decay for learning rate.") #0.5一次衰减多少
-tf.app.flags.DEFINE_string("ckpt_dir","text_rnn_checkpoint/","checkpoint location for the model")
+tf.app.flags.DEFINE_string("ckpt_dir","/output/","checkpoint location for the model")
 tf.app.flags.DEFINE_integer("sequence_length",200,"max sentence length")
 tf.app.flags.DEFINE_integer("embed_size",300,"embedding size")
 tf.app.flags.DEFINE_boolean("is_training",False,"is traning.true:tranining,false:testing/inference")
 tf.app.flags.DEFINE_integer("num_epochs",50,"embedding size")
 tf.app.flags.DEFINE_integer("validate_every", 1, "Validate every validate_every epochs.") #每10轮做一次验证
 tf.app.flags.DEFINE_boolean("use_embedding",True,"whether to use embedding or not.")
-tf.app.flags.DEFINE_string("file_path","/home/lanchong/toxic/text-classification/data/twice/data_file","train data and val data and embedding matrix")
+tf.app.flags.DEFINE_string("file_path","/input/data_file","train data and val data and embedding matrix")
 #tf.app.flags.DEFINE_string("traning_data_path","train-zhihu4-only-title-all.txt","path of traning data.") #train-zhihu4-only-title-all.txt===>training-data/test-zhihu4-only-title.txt--->'training-data/train-zhihu5-only-title-multilabel.txt'
 #tf.app.flags.DEFINE_string("word2vec_model_path","zhihu-word2vec.bin-100","word2vec's vocabulary and vectors")
 
@@ -73,7 +73,7 @@ def main(_):
     #2.create session.
     config=tf.ConfigProto()
     config.gpu_options.allow_growth=True
-    sample_submission = pd.read_csv('../data/sample_submission.csv')
+    sample_submission = pd.read_csv('/submission/sample_submission.csv')
     list_classes = ["toxic", "severe_toxic", "obscene", "threat", "insult", "identity_hate"]
     with tf.Session(config=config) as sess:
         #Instantiate Model
@@ -81,13 +81,13 @@ def main(_):
         vocab_size, FLAGS.embed_size, FLAGS.is_training)
         #Initialize Save
         saver=tf.train.Saver()
-        if os.path.exists(FLAGS.ckpt_dir+"checkpoint"):
+        if os.path.exists("/model/"+"checkpoint"):
             print("Restoring Variables from Checkpoint for rnn model.")
-            saver.restore(sess,tf.train.latest_checkpoint(FLAGS.ckpt_dir))
+            saver.restore(sess,"/model/model.ckpt-5")
         result = predict(sess,textRNN,X_te,FLAGS.batch_size)
 
         sample_submission[list_classes] = result
-        sample_submission.to_csv('submission.csv', index=False)
+        sample_submission.to_csv('/output/submission.csv', index=False)
 
         '''
         curr_epoch=sess.run(textRNN.epoch_step)
@@ -212,13 +212,13 @@ def predict(sess, textRNN, testX,batch_size):
                 
             logits = sess.run(textRNN.probality,#curr_eval_acc--->textCNN.accuracy
                                             feed_dict={textRNN.input_x: testX[start:start+batch_size]
-                                                ,textRNN.dropout_keep_prob:1})
+                                                ,textRNN.dropout_keep_prob:1,K.learning_phase():0})
             result[start:start+batch_size] = logits
 
         else:
             logits = sess.run(textRNN.probality,#curr_eval_acc--->textCNN.accuracy
                                             feed_dict={textRNN.input_x: testX[start:end]
-                                                ,textRNN.dropout_keep_prob:1})  
+                                                ,textRNN.dropout_keep_prob:1,K.learning_phase():0})  
             result[start:end] = logits          
         #logits = tf.sigmoid(logits)
         #label_list_top5 = get_label_using_logits(logits_[0], vocabulary_index2word_label)

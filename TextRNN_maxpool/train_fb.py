@@ -14,11 +14,12 @@ import pickle
 import matplotlib.pyplot as plt
 from oversample import label_shuffle
 from sklearn.metrics import roc_auc_score
+from keras import backend as K
 #configuration
 FLAGS=tf.app.flags.FLAGS
 tf.app.flags.DEFINE_integer("num_classes",6,"number of label")
 tf.app.flags.DEFINE_float("learning_rate",0.001,"learning rate")
-tf.app.flags.DEFINE_integer("batch_size", 128, "Batch size for training/evaluating.") #批处理的大小 32-->128
+tf.app.flags.DEFINE_integer("batch_size", 512, "Batch size for training/evaluating.") #批处理的大小 32-->128
 tf.app.flags.DEFINE_integer("decay_steps", 200, "how many steps before decay learning rate.") #批处理的大小 32-->128
 tf.app.flags.DEFINE_float("decay_rate", 0.9, "Rate of decay for learning rate.") #0.5一次衰减多少
 tf.app.flags.DEFINE_string("ckpt_dir","/output/","checkpoint location for the model")
@@ -144,7 +145,8 @@ def main(_):
                 curr_loss, curr_tureloss, curr_acc, _, step_num = sess.run([textRNN.loss_val, textRNN.true_loss, textRNN.accuracy, textRNN.train_op, textRNN.global_step],
                                                                             feed_dict={textRNN.input_x:batch_x,
                                                                                       textRNN.input_y:batch_y,
-                                                                                      textRNN.dropout_keep_prob:0.9}) #curr_acc--->TextCNN.accuracy -->,textRNN.dropout_keep_prob:1
+                                                                                      textRNN.dropout_keep_prob:1,
+                                                                                       K.learning_phase(): 1}) #curr_acc--->TextCNN.accuracy -->,textRNN.dropout_keep_prob:1
                 loss,trueloss, counter,acc=loss+curr_loss, trueloss+curr_tureloss, counter+1,acc+curr_acc
                 step_list.append(step_num)
                 loss_list.append(curr_tureloss)
@@ -154,9 +156,9 @@ def main(_):
                 if step_num % 50 == 0:
                     test_step_list.append(step_num)
                     eval_loss, eval_trueloss, eval_acc,eval_auc=do_eval(sess,textRNN,testX,testY,batch_size)
-                    print("Epoch %d Validation Loss:%.3f\tValidation trueLoss:%.3f\tValidation Accuracy: %.3f\tValidation AUC:%.3f" % (epoch,eval_loss,eval_trueloss,eval_acc,eval_auc))
+                    print("Epoch %d Validation Loss:%.4f\tValidation trueLoss:%.4f\tValidation Accuracy: %.4f\tValidation AUC:%.4f" % (epoch,eval_loss,eval_trueloss,eval_acc,eval_auc))
                     test_loss_list.append(eval_trueloss)
-                    if eval_trueloss <= 0.039:
+                    if eval_trueloss <= 0.035:
                         save_path=FLAGS.ckpt_dir+"model.ckpt"
                         saver.save(sess,save_path,global_step=epoch)
                         early_stop = True
@@ -177,13 +179,14 @@ def main(_):
                 #save model to checkpoint
                 save_path=FLAGS.ckpt_dir+"model.ckpt"
                 saver.save(sess,save_path,global_step=epoch)
+        '''
         plt.plot(step_list, loss_list)
         plt.savefig("noL2_drop_maxpool_train")
         plt.close()
         plt.plot(test_step_list, test_loss_list)
         plt.savefig("noL2_drop_maxpool_test")
         plt.close()
-        
+        '''
 
         # 5.最后在测试集上做测试，并报告测试准确率 Test
         #test_loss, test_acc = do_eval(sess, textRNN, testX, testY, batch_size,vocabulary_index2word_label)
@@ -266,7 +269,7 @@ def do_eval(sess,textRNN,evalX,evalY,batch_size):
         if start+batch_size < end:
             curr_eval_loss, curr_tureloss, probality,curr_eval_acc= sess.run([textRNN.loss_val, textRNN.true_loss, textRNN.probality,textRNN.accuracy],#curr_eval_acc--->textCNN.accuracy
                                             feed_dict={textRNN.input_x: evalX[start:start+batch_size],textRNN.input_y: evalY[start:start+batch_size]
-                                                ,textRNN.dropout_keep_prob:1})
+                                                ,textRNN.dropout_keep_prob:1,K.learning_phase():0})
 
             probality_total.extend(probality)
 
@@ -274,7 +277,7 @@ def do_eval(sess,textRNN,evalX,evalY,batch_size):
         else:
             curr_eval_loss, curr_tureloss, probality,curr_eval_acc= sess.run([textRNN.loss_val, textRNN.true_loss, textRNN.probality,textRNN.accuracy],#curr_eval_acc--->textCNN.accuracy
                                             feed_dict={textRNN.input_x: evalX[start:end],textRNN.input_y: evalY[start:end]
-                                                ,textRNN.dropout_keep_prob:1})
+                                                ,textRNN.dropout_keep_prob:1,K.learning_phase():0})
             rest_count = end - start
             probality_total.extend(probality)
             eval_loss, trueloss, eval_acc = eval_loss + curr_eval_loss*rest_count, trueloss + curr_tureloss*rest_count, eval_acc + curr_eval_acc*rest_count  
