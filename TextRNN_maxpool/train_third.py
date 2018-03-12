@@ -75,6 +75,19 @@ def generate_batch(trainX, trainY, batch_size):
                 batch_y = []
                 curr_num = 0
 
+def shuffle_split(train_x, train_y, ratio=0.1):
+    index = np.arange(len(train_x))
+    np.random.shuffle(index)
+    train_x = train_x[index]
+    train_y = train_y[index]
+
+    train_num = int(len(train_x)*(1-ratio))
+    t_x = train_x[0:train_num]
+    t_y = train_y[0:train_num]
+    v_x = train_x[train_num:-1]
+    v_y = train_y[train_num:-1]
+    return t_x, t_y, v_x, v_y
+
 def get_data(max_num,max_len):
     train = pd.read_csv("/input/clean_train.csv")
     test = pd.read_csv("/input/clean_test.csv")
@@ -134,13 +147,10 @@ def main(_):
     
     #orignal_X, orignal_Y, testX, testY, embed_matrix= pickle.load(data_f)
     X_t,train_y,embed_matrix = get_data(max_num=50000,max_len=200)
-    
-    trainX, trainY, testX, testY, embed_matrix= 
+    trainX, trainY, testX, testY = shuffle_split(X_t,train_y)
     vocab_size = len(embed_matrix)
     print(vocab_size)
     #print("total train sample num is %s" %len(orignal_X))
-    trainX = pad_sequences(trainX, maxlen=FLAGS.sequence_length, value=0.)  # padding to max length
-    testX = pad_sequences(testX, maxlen=FLAGS.sequence_length, value=0.)  # padding to max length
 
     '''
     if 1==1:
